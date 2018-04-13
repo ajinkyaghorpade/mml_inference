@@ -1,0 +1,1 @@
+is.singular.mat <- function(m) class(try(solve(m),silent=T))=="matrix"
