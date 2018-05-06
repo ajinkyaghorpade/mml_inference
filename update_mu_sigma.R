@@ -1,37 +1,39 @@
 # THis function performs update on mu_h and Sigma_h parameters from equations 25, 26 and 27
 
 
-update_mu_sigma <- function(H, K, J, h, mu_h_h, Sigma_h_h, mu_zeta_h, Sigma_zeta_h, omega, Upsilon, y_h, x_h)
+update_mu_sigma <- function(mu_h_h, Sigma_h_h, mu_zeta_h, Sigma_zeta_h, omega, Upsilon, y_h, x_h)
 {
-  results <- perform_newtons_method(h, omega, J, y_h, x_h, mu_h_h, Sigma_h_h, Upsilon, 1e-5);
+  results <- perform_newtons_method(omega, y_h, x_h, mu_h_h, Sigma_h_h, Upsilon, 1e-5);
   while (!results$converged) {
     #mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged
-    results <- perform_newtons_method(h, omega, J, y_h, x_h, results$mu_h_h, results$Sigma_h_h, Upsilon, 1e-5);
+    results <- perform_newtons_method(omega, y_h, x_h, results$mu_h_h, results$Sigma_h_h, Upsilon, 1e-5);
   }
   return(results);
 }
 
 # Objective function - only containing the mu_h and Sigma_h terms
-evaluate_L_tilde <- function(K, h, Sigma_h, mu_h, Sigma_zeta, mu_zeta, omega, Upsilon, J, y, x)
+evaluate_L_tilde <- function(mu_h_h, Sigma_h_h, mu_zeta, Sigma_zeta, omega, Upsilon, y_h, x_h)
 {
-  stopifnot(is.singular.mat(Sigma_h[[h]]));
-  normal_entropy <- 0.5 %*% log(((2 * pi * exp(1))^(K)) %*% determinant(Sigma_h[[h]])$modulus);
+  K <- dim(x_h[[1]])[2]; # number of attributes
+  stopifnot(is.singular.mat(Sigma_h_h));
+  normal_entropy <- 0.5 %*% log(((2 * pi * exp(1))^(K)) %*% determinant(Sigma_h_h)$modulus);
   
-  mu_diff <- mu_zeta[[h]] - mu_h[[h]];
-  mvn_cross_entropy <- Sigma_zeta[[h]] + Sigma_h[[h]] + t(mu_diff) %*% mu_diff;
+  mu_diff <- mu_zeta - mu_h_h;
+  mvn_cross_entropy <- Sigma_zeta + Sigma_h_h + t(mu_diff) %*% mu_diff;
   mvn_cross_entropy <- 0.5 * omega %*% trace(Upsilon %*% mvn_cross_entropy);
   
   d0 <- 0;  #LSE term
   # Repeat for each choice event
-  for (t in seq(1, length(y[[h]]))) 
+  for (t in seq(1, length(y_h))) 
   {
     d0_first_term <- 0;
     d0_second_term <- 0;
+    J <- dim(x_h[[t]])[1];
     for (j in seq(1,J)) 
     {
-      d0_first_term <- d0_first_term + y[[h]][[t]][j] * (x[[h]][[t]][j,] %*% t(mu_h[[h]]));
-      d0_second_term <- d0_second_term + exp((x[[h]][[t]][j,] %*% t(mu_h[[h]]))
-                                             + (0.5 * x[[h]][[t]][j,] %*% Sigma_h[[h]] %*% t(x[[h]][[t]][j,])));
+      d0_first_term <- d0_first_term + y_h[[t]][j] * (x_h[[t]][j,] %*% t(mu_h_h));
+      d0_second_term <- d0_second_term + exp((x_h[[t]][j,] %*% t(mu_h_h))
+                                             + (0.5 * x_h[[t]][j,] %*% Sigma_h_h %*% t(x_h[[t]][j,])));
     }
     d0 <- d0 + (d0_first_term - log(d0_second_term));
   }
@@ -138,7 +140,7 @@ evaluate_gradient_L_h <- function(omega, Upsilon, x_h, mu_h_h, Sigma_h_h)
 
 # Use the gradients and the hessian to perform the Newton Updates
 # Perform optimization step till convergence.
-perform_newtons_method <- function(h, omega, J, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5)
+perform_newtons_method <- function(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5)
 {
   converged <- FALSE;
   
@@ -170,11 +172,11 @@ perform_newtons_method <- function(h, omega, J, y_h, x_h, mu_h_h, Sigma_h_h, mu_
     
     # Line search to choose step size t by backtracking line search.
     # alpha = 0.02 , beta = 0.4
-    step_size_mu = backtracking_line_search("evaluate_L_tilde", list(mu_h=mu_h), gradient_mu, delta_mu_h, 
-                                            list(h, omega, Upsilon, mu_zeta, mu_h, Sigma_h, J, y, x),
+    step_size_mu = backtracking_line_search("evaluate_L_tilde", list(mu_h_h=mu_h_h), gradient_mu, delta_mu_h, 
+                                            list(mu_h_h, Sigma_h_h, mu_zeta, Sigma_zeta, omega, Upsilon, y_h, x_h),
                                             alpha = 0.15, beta = 0.4)
-    step_size_L = backtracking_line_search("evaluate_L_tilde", list(Sigma_h=Sigma_h), gradient_L, delta_L_h, 
-                                            list(h, omega, Upsilon, mu_zeta, mu_h, Sigma_h, J, y, x),
+    step_size_L = backtracking_line_search("evaluate_L_tilde", list(Sigma_h_h=Sigma_h_h), gradient_L, delta_L_h, 
+                                            list(mu_h_h, Sigma_h_h, mu_zeta, Sigma_zeta, omega, Upsilon, y_h, x_h),
                                             alpha = 0.15, beta = 0.4)
     #Update parameters
     mu_h_h <- mu_h_h + step_size_mu %*% delta_mu_h;
@@ -193,7 +195,7 @@ backtracking_line_search <- function(obj_fn, value, gradient_value, delta_value,
 {
   # initialize
   t = 1;
-  new_obj_fn_inputs[[names(value)]][[obj_fn_inputs[["h"]]]] <- value[[obj_fn_inputs[["h"]]]][[1]] + t * delta_value;
+  new_obj_fn_inputs[[names(value)]] <- value[[1]] + t * delta_value;
   # Calculate f(value+t* delta value) 
   # TODO: First check if value + t*delta value is in domain of f. 
   # If not then set t = beta * t and recalculate until the condition is satisfied.
@@ -204,7 +206,7 @@ backtracking_line_search <- function(obj_fn, value, gradient_value, delta_value,
     # decrement t
     t = beta * t;
     #re-evaluate objective function
-    new_obj_fn_inputs[[names(value)]][[obj_fn_inputs[["h"]]]] <- value[[obj_fn_inputs[["h"]]]][[1]] + t * delta_value;
+    new_obj_fn_inputs[[names(value)]] <- value[[1]] + t * delta_value;
     new_obj_value = do.call(obj_fn, new_obj_fn_inputs);
   }
   

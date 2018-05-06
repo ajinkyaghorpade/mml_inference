@@ -5,7 +5,7 @@ perform_var_hier_inf <- function(x, y, beta_0, Omega_0, S, nu)
   S_inv <- matrix.inverse(S);
   H <- length(y);
   convereged <- FALSE;
-  K <- dim()
+  
   # Initialize mu_h, Sigma_h, mu_zeta, Sima_zeta, omega, beta_h
   
   omega = nu + H;
