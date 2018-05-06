@@ -9,7 +9,7 @@
 # H : number of agents
 # Sigma_zeta : Variational parameter mu_zeta K x K dimensional covariance matrix. 
 #               Sigma_zeta is the covariance matrix of the multivariate normal prior over zeta
-update_Upsilon <- function(S, Sigma_h, mu_zeta, mu_h, H, Sigma_zeta)
+update_Upsilon <- function(H, S_inv, mu_h, Sigma_h, mu_zeta, Sigma_zeta)
 {
   # Update the middle term of equation 42
   middle_term = 0;
@@ -18,9 +18,7 @@ update_Upsilon <- function(S, Sigma_h, mu_zeta, mu_h, H, Sigma_zeta)
     middle_term <- middle_term + Sigma_h[[h]] + t(mu_diff) %*% mu_diff
   }
   
-  # Check if S is invertible
-  stopifnot(is.singular.mat(S));
-  all_terms <- matrix.inverse(S) + middle_term + H * Sigma_zeta;
+  all_terms <- S_inv + middle_term + H * Sigma_zeta;
   stopifnot(is.singular.mat(all_terms));
   upsilon <- matrix.inverse(all_terms);
   return(upsilon)

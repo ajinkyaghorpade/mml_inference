@@ -6,7 +6,7 @@ update_mu_zeta <- function(Omega_0, H, omega, Upsilon, Beta_0, mu_h)
   for (h in seq(1,H)) {
     sum_mu_h = sum_mu_h + mu_h[[h]];
   }
-  sum_mu_h <- sum_mu_h / H;
+  #sum_mu_h <- sum_mu_h / H;
   stopifnot(is.singular.mat(Omega_0));
   first_term <- (matrix.inverse(Omega_0) + H * omega * Upsilon);
   

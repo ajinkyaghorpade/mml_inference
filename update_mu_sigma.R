@@ -1,178 +1,212 @@
 # THis function performs update on mu_h and Sigma_h parameters from equations 25, 26 and 27
 
 
-update_mu_sigma <- function(K, H, Sigma_h, Omega, mu_h, zeta, T_h, J, y, x)
+update_mu_sigma <- function(H, K, J, h, mu_h_h, Sigma_h_h, mu_zeta_h, Sigma_zeta_h, omega, Upsilon, y_h, x_h)
 {
-  # Objective function
-  L_tilde <- function(K, H, Sigma_h, Omega, mu_h, zeta, J, y, x)
+  results <- perform_newtons_method(h, omega, J, y_h, x_h, mu_h_h, Sigma_h_h, Upsilon, 1e-5);
+  while (!results$converged) {
+    #mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged
+    results <- perform_newtons_method(h, omega, J, y_h, x_h, results$mu_h_h, results$Sigma_h_h, Upsilon, 1e-5);
+  }
+  return(results);
+}
+
+# Objective function - only containing the mu_h and Sigma_h terms
+evaluate_L_tilde <- function(K, h, Sigma_h, mu_h, Sigma_zeta, mu_zeta, omega, Upsilon, J, y, x)
+{
+  stopifnot(is.singular.mat(Sigma_h[[h]]));
+  normal_entropy <- 0.5 %*% log(((2 * pi * exp(1))^(K)) %*% determinant(Sigma_h[[h]])$modulus);
+  
+  mu_diff <- mu_zeta[[h]] - mu_h[[h]];
+  mvn_cross_entropy <- Sigma_zeta[[h]] + Sigma_h[[h]] + t(mu_diff) %*% mu_diff;
+  mvn_cross_entropy <- 0.5 * omega %*% trace(Upsilon %*% mvn_cross_entropy);
+  
+  d0 <- 0;  #LSE term
+  # Repeat for each choice event
+  for (t in seq(1, length(y[[h]]))) 
   {
-    stopifnot(is.singular.mat(Omega));
-    normal_entropy <- 0;
-    for (h in seq(1,H)) 
+    d0_first_term <- 0;
+    d0_second_term <- 0;
+    for (j in seq(1,J)) 
     {
-      stopifnot(is.singular.mat(Sigma_h));
-      normal_entropy <- normal_entropy + log(((2 * pi * exp(1))^(K)) %*% determinant(Sigma_h[[h]])$modulus);
+      d0_first_term <- d0_first_term + y[[h]][[t]][j] * (x[[h]][[t]][j,] %*% t(mu_h[[h]]));
+      d0_second_term <- d0_second_term + exp((x[[h]][[t]][j,] %*% t(mu_h[[h]]))
+                                             + (0.5 * x[[h]][[t]][j,] %*% Sigma_h[[h]] %*% t(x[[h]][[t]][j,])));
     }
-    normal_entropy <- 0.5 * normal_entropy;
-    
-    mvn_cross_entropy_first_term <- (H / 2) %*% (log(((2 * pi)^K) %*% determinant(Omega)$modulus));
-    
-    mvn_cross_entropy_second_term <- 0;
-    for (h in seq(1,H)) 
-    {
-      mu_diff <- mu_h[[h]] - zeta;
-      mvn_cross_entropy_second_term <- mvn_cross_entropy_second_term + Sigma_h[[h]] + t(mu_diff) %*% mu_diff
-    }
-    mvn_cross_entropy_second_term <- 0.5 %*% trace(matrix.inverse(Omega) %*% mvn_cross_entropy_second_term);
-    
-    d0 <- 0;
-    # Repeat for each agent
-    for (h in seq(1,H)) 
-    {
-      # Repeat for each choice event
-      for (t in seq(1, length(y[[h]]))) 
-      {
-        d0_first_term <- 0;
-        d0_second_term <- 0;
-        for (j in seq(1,J)) 
-        {
-          d0_first_term <- d0_first_term + y[[h]][[t]][j] * (x[[h]][[t]][j,] %*% t(mu_h[[h]]));
-          d0_second_term <- d0_second_term + exp((x[[h]][[t]][j,] %*% t(mu_h[[h]]))
-                                                 + (0.5 * x[[h]][[t]][j,] %*% Sigma_h[[h]] %*% t(x[[h]][[t]][j,])));
-        }
-        d0 <- d0 + (d0_first_term - log(d0_second_term));
-      }
-    }
-    
-    # L_tilde equation 25
-    L_tilde <- normal_entropy + mvn_cross_entropy_first_term + mvn_cross_entropy_second_term + d0;
-    return(L_tilde);
+    d0 <- d0 + (d0_first_term - log(d0_second_term));
   }
   
-  # w_j function w_j(mu, Sigma, x) = exp(x_j' * mu + (0.5) * x_j' * Sigma * x_j) unnormalized
-  w_j <- function(x_h_t_j, mu_h_h, Sigma_h_h)
+  # L_tilde
+  L_tilde <- normal_entropy - mvn_cross_entropy + d0;
+  return(L_tilde);
+}
+
+
+# w_j function w_j(mu, Sigma, x) = exp(x_j' * mu + (0.5) * x_j' * Sigma * x_j) unnormalized
+evaluate_w_j <- function(x_h_t_j, mu_h_h, Sigma_h_h)
+{
+  w_j_val <- exp(t(x_h_t_j) %*% t(mu_h_h) + (0.5 * x_h_t_j %*% Sigma_h_h %*% t(x_h_t_j)));
+  return(w_j_val);
+}
+
+
+# Gradient of mu_h
+evaluate_gradient_mu_h <- function(omega, Upsilon, mu_h_h, Sigma_h_h, y_h, x_h)
+{
+  first_term <- omega %*% Upsilon %*% (mu_zeta - mu_h_h);
+  second_term <- 0;
+  for (t in seq(1,length(y_h))) 
   {
-    w_j_val <- exp(t(x_h_t_j) %*% t(mu_h_h) + (0.5 * x_h_t_j %*% Sigma_h_h %*% t(x_h_t_j)));
-    return(w_j_val);
-  }
-  
-  # Gradient of mu_h
-  gradient_mu_h <- function(Omega, zeta, J, y_h, x_h, mu_h_h, Sigma_h_h)
-  {
-    stopifnot(is.singular.mat(Omega));
-    first_term <- -matrix.inverse(Omega) %*% (mu_h_h - zeta);
-    second_term <- 0;
-    for (t in seq(1,length(y_h))) 
-    {
-      # calculate w_j and normalize
-      w_j_array <- vector(mode = "numeric", length = J);
-      for (j in seq(1,J)) {
-        w_j_array[j] <- w_j(x_h[[t]][j], mu_h_h, Sigma_h_h)
-      }
-      w_j_array <- w_j_array / sum(w_j_array);
-      for (j in seq(1,J)) {
-        second_term <- second_term + (y_h[[t]][j] - w_j_array[j]) %*% x_h[[t]][j,];
-      }
+    # calculate w_j and normalize
+    J <- dim(x_h[[t]])[1];
+    w_j_array <- vector(mode = "numeric", length = J);
+    for (j in seq(1,J)) {
+      w_j_array[j] <- evaluate_w_j(x_h[[t]][j,], mu_h_h, Sigma_h_h)
     }
-    
-    gradient <- first_term + second_term;
-    return(gradient);
-  }
-  
-  # w_t function w_t(mu, Sigma, x) = exp(x_t' * mu + (0.5) * x_t' * Sigma * x_t) # J x J dimensional
-  w_t <- function(x_h_t, mu_h_h, Sigma_h_h)
-  {
-    w_t_val <- exp((x_h_t %*% mu_h_h) + (0.5 * x_h_t %*% Sigma_h_h %*% t(x_h_t)));
-    return(w_t_val);
-  }
-  
-  # Hessian of mu_h
-  hessian_mu_h <- function(Omega, x_h, mu_h_h, Sigma_h_h)
-  {
-    stopifnot(is.singular.mat(Omega));
-    first_term <- - matrix.inverse(Omega);
-    second_term <- 0;
-    for (t in seq(1,length(x_h))) 
-    {
-      w_h_t <- w_t(x_h[[t]], mu_h_h, Sigma_h_h);
-      second_term <- second_term + ( t(x_h[[t]] %*% diag(w_h_t)) %*% x_h[[t]]) - (t(x_h[[t]]) %*% w_h_t) %*% (x_h[[t]] %*% w_h_t);
-    }
-    hessian <- first_term - second_term;
-    return(hessian);
-  }
-  
-  # Hessian of L_h where Sigma_h := L_h' x L_h
-  hessian_L_h <- function(Omega, x_h, mu_h_h, Sigma_h_h)
-  {
-    stopifnot(is.singular.mat(Sigma_h_h));
-    stopifnot(is.singular.mat(Omega));
-    hessian <- matrix.inverse(Sigma_h_h) - matrix.inverse(Omega);
-    for (t in seq(1,length(x_h))) {
-      w_h_t <- w_t(x_h[[t]], mu_h_h, Sigma_h_h);
-      hessian <- hessian - ( t(x_h[[t]] %*% diag(w_h_t)) %*% x_h[[t]]);
+    w_j_array <- w_j_array / sum(w_j_array);
+    for (j in seq(1,J)) {
+      second_term <- second_term + ((y_h[[t]][j] - w_j_array[j]) %*% x_h[[t]][j,]);
     }
   }
   
-  # Gradient of L_h
-  gradient_L_h <- function(Omega, x_h, mu_h_h, Sigma_h_h)
+  gradient <- first_term + second_term;
+  return(gradient);
+}
+
+# Hessian of mu_h
+evaluate_hessian_mu_h <- function(omega, Upsilon, x_h, mu_h_h, Sigma_h_h)
+{
+  first_term <- - omega %*% Upsilon;
+  second_term <- 0;
+  for (t in seq(1,length(x_h))) 
   {
-    stopifnot(is.singular.mat(Sigma_h_h));
-    
-    R_h_h <- chol(Sigma_h_h);
-    L_h_h <- t(R_h_h);
-    quadratic_term <- 0;
-    for (t in seq(1,length(x_h))) {
-      w_h_t <- w_t(x_h[[t]], mu_h_h, Sigma_h_h);
-      quadratic_term <- quadratic_term + ( t(x_h[[t]] %*% diag(w_h_t)) %*% x_h[[t]]);
+    # calculate w_j and normalize
+    J <- dim(x_h[[t]])[1];
+    w_h_t <- vector(mode = "numeric", length = J);
+    for (j in seq(1,J)) {
+      w_h_t[j] <- evaluate_w_j(x_h[[t]][j,], mu_h_h, Sigma_h_h)
     }
-    stopifnot(is.singular.mat(R_h_h));
-    gradient <- matrix.inverse(R_h_h) - (matrix.inverse(Omega) + quadratic_term) %*% L_h_h;
-    return(gradient);
+    w_h_t <- w_h_t / sum(w_h_t);
+    second_term <- second_term + ( t(x_h[[t]] %*% diag(w_h_t)) %*% x_h[[t]]) - 
+      ((x_h[[t]] %*% t(w_h_t)) %*% (t(x_h[[t]]) %*% w_h_t));
+  }
+  hessian <- first_term + second_term;
+  return(hessian);
+}
+
+# Hessian of L_h where Sigma_h := L_h' x L_h
+evaluate_hessian_L_h <- function(omega, x_h, mu_h_h, Sigma_h_h)
+{
+  stopifnot(is.singular.mat(Sigma_h_h));
+  hessian <- matrix.inverse(determinant(Sigma_h_h)$modulus) - omega %*% Upsilon;
+  for (t in seq(1,length(x_h))) {
+    # calculate w_j and normalize
+    J <- dim(x_h[[t]])[1];
+    w_h_t <- vector(mode = "numeric", length = J);
+    for (j in seq(1,J)) {
+      w_h_t[j] <- evaluate_w_j(x_h[[t]][j,], mu_h_h, Sigma_h_h);
+    }
+    w_h_t <- w_h_t / sum(w_h_t);
+    hessian <- hessian - ( t(x_h[[t]] %*% diag(w_h_t)) %*% x_h[[t]]);
+  }
+  hessian <- 0.5 * hessian;
+  return(hessian);
+}
+
+# Gradient of L_h
+evaluate_gradient_L_h <- function(omega, Upsilon, x_h, mu_h_h, Sigma_h_h)
+{
+  stopifnot(is.singular.mat(Sigma_h_h));
+  
+  R_h_h <- chol(Sigma_h_h);
+  L_h_h <- t(R_h_h);
+  quadratic_term <- 0;
+  for (t in seq(1,length(x_h))) {
+    # calculate w_j and normalize
+    J <- dim(x_h[[t]])[1];
+    w_h_t <- vector(mode = "numeric", length = J);
+    for (j in seq(1,J)) {
+      w_h_t[j] <- evaluate_w_j(x_h[[t]][j,], mu_h_h, Sigma_h_h);
+    }
+    w_h_t <- w_h_t / sum(w_h_t);
+    quadratic_term <- quadratic_term + ( t(x_h[[t]] %*% diag(w_h_t)) %*% x_h[[t]]);
+  }
+  stopifnot(is.singular.mat(R_h_h));
+  gradient <- matrix.inverse(R_h_h) - (omega %*% Upsilon + quadratic_term) %*% L_h_h;
+  return(gradient);
+}
+
+# Use the gradients and the hessian to perform the Newton Updates
+# Perform optimization step till convergence.
+perform_newtons_method <- function(h, omega, J, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5)
+{
+  converged <- FALSE;
+  
+  # Update the mu_h_h parameter
+  # Compute the newtown step
+  hessian_mu <- evaluate_hessian_mu_h(omega, Upsilon, x_h, mu_h_h, Sigma_h_h);
+  gradient_mu <- evaluate_gradient_mu_h(omega, Upsilon, mu_h_h, Sigma_h_h, y_h, x_h);
+  stopifnot(is.singular.mat(hessian_mu));
+  hessian_mu_inv <- matrix.inverse(hessian_mu) ;
+  delta_mu_h <- - hessian_mu_inv %*% gradient_mu;
+  lambda_sq_mu <- t(gradient_mu) %*% hessian_mu_inv %*% gradient_mu;
+  
+  
+  # Update the Sigma_h_h parameter
+  # Compute the newtown step
+  hessian_L <- evaluate_hessian_L_h(omega, x_h, mu_h_h, Sigma_h_h);
+  gradient_L <- evaluate_gradient_L_h(omega, Upsilon, x_h, mu_h_h, Sigma_h_h);
+  stopifnot(is.singular.mat(hessian_L));
+  hessian_L_inv <- matrix.inverse(hessian_L) ;
+  delta_L_h <- - hessian_L_inv %*% gradient_L;
+  lambda_sq_L <- t(gradient_L) %*% hessian_L_inv %*% gradient_L;
+  
+  # Stopping criterion.
+  if(lambda_sq_L <= epsilon || lambda_sq_mu <= epsilon)
+  {
+    converged <- TRUE;
+  }else
+  {
+    
+    # Line search to choose step size t by backtracking line search.
+    # alpha = 0.02 , beta = 0.4
+    step_size_mu = backtracking_line_search("evaluate_L_tilde", list(mu_h=mu_h), gradient_mu, delta_mu_h, 
+                                            list(h, omega, Upsilon, mu_zeta, mu_h, Sigma_h, J, y, x),
+                                            alpha = 0.15, beta = 0.4)
+    step_size_L = backtracking_line_search("evaluate_L_tilde", list(Sigma_h=Sigma_h), gradient_L, delta_L_h, 
+                                            list(h, omega, Upsilon, mu_zeta, mu_h, Sigma_h, J, y, x),
+                                            alpha = 0.15, beta = 0.4)
+    #Update parameters
+    mu_h_h <- mu_h_h + step_size_mu %*% delta_mu_h;
+    L_h_h <- L_h_h + step_size_L %*% delta_L_h;
+    Sigma_h_h <- L_h_h %*% t(L_h_h);
   }
   
-  # Use the gradients and the hessian to perform the Newton Updates
-  # Perform optimization step till convergence.
-  newtons_method <- function(Omega, zeta, J, y_h, x_h, mu_h_h, Sigma_h_h, step_size, epsilon)
-  {
-    converged <- FALSE;
-    
-    # Update the mu_h_h parameter
-    # Compute the newtown step
-    hessian_mu <- do.call("hessian_mu_h", list(Omega, x_h, mu_h_h, Sigma_h_h));
-    gradient_mu <- do.call("gradient_mu_h", list(Omega, zeta, J, y_h, x_h, mu_h_h, Sigma_h_h));
-    stopifnot(is.singular.mat(hessian_mu));
-    hessian_mu_inv <- matrix.inverse(hessian_mu) ;
-    delta_mu_h <- - hessian_mu_inv %*% gradient_mu;
-    lambda_sq_mu <- t(gradient_mu) %*% hessian_mu_inv %*% gradient_mu;
-    
-    
-    # Update the Sigma_h_h parameter
-    # Compute the newtown step
-    hessian_L <- do.call("hessian_L_h", list(Omega, x_h, mu_h_h, Sigma_h_h));
-    gradient_L <- do.call("gradient_L_h", list(Omega, x_h, mu_h_h, Sigma_h_h));
-    stopifnot(is.singular.mat(hessian_L));
-    hessian_L_inv <- matrix.inverse(hessian_L) ;
-    delta_L_h <- - hessian_L_inv %*% gradient_L;
-    lambda_sq_L <- t(gradient_L) %*% hessian_L_inv %*% gradient_L;
-    
-    # Stopping criterion.
-    if(lambda_sq_L <= epsilon || lambda_sq_mu <= epsilon)
-    {
-      converged <- TRUE;
-    }else
-    {
-      
-      # TODO:Line search to choose step size t by backtracking line search.
-      
-      #Update parameters
-      mu_h_h <- mu_h_h + step_size %*% delta_mu_h;
-      L_h_h <- L_h_h + step_size %*% delta_L_h;
-      Sigma_h_h <- L_h_h %*% t(L_h_h);
-    }
-    
-    # Create return structure
-    results <- list(mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged);
-    
-    return(results);
+  # Create return structure
+  results <- list(mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged);
+  
+  return(results);
+}
+
+# Function to perform backtracking line search
+backtracking_line_search <- function(obj_fn, value, gradient_value, delta_value, obj_fn_inputs, alpha, beta)
+{
+  # initialize
+  t = 1;
+  new_obj_fn_inputs[[names(value)]][[obj_fn_inputs[["h"]]]] <- value[[obj_fn_inputs[["h"]]]][[1]] + t * delta_value;
+  # Calculate f(value+t* delta value) 
+  # TODO: First check if value + t*delta value is in domain of f. 
+  # If not then set t = beta * t and recalculate until the condition is satisfied.
+  new_obj_value = do.call(obj_fn, new_obj_fn_inputs);
+  curr_obj_value = do.call(obj_fn, obj_fn_inputs);
+  
+  while (new_obj_value > (curr_obj_value + alpha %*% t %*% t(gradient_value) %*% delta_value)) {
+    # decrement t
+    t = beta * t;
+    #re-evaluate objective function
+    new_obj_fn_inputs[[names(value)]][[obj_fn_inputs[["h"]]]] <- value[[obj_fn_inputs[["h"]]]][[1]] + t * delta_value;
+    new_obj_value = do.call(obj_fn, new_obj_fn_inputs);
   }
+  
+  return(t);
 }
