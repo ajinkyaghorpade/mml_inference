@@ -1,5 +1,10 @@
 source('./simulate_data.R');
 
+#Required libraries
+library(mlogit);
+library(matrixcalc);
+library(bayesm);
+library(data.table);
 
 # Set the seed for random experiments
 set.seed(100);

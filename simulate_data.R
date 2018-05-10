@@ -24,12 +24,12 @@ library(bayesm);
 library(MASS);
 
 # This function generates MNL data for given number of agents H, number of choices J, number of items K, mean XI and sd cov matrix Omega
-generate_data <- function(H, K, J, XI, Omega) {
+generate_data <- function(H, K, J, zeta, Omega) {
   # MNL coefficients \beta_h
   Beta <- list();
   for (agent_idx in seq(1,H))
   {
-    Beta[[agent_idx]] <- rnorm(K, mean = XI, sd = sqrt(Omega));
+    Beta[[agent_idx]] <- rnorm(K, mean = zeta, sd = sqrt(Omega));
   }
   
   # X attributes
@@ -39,7 +39,7 @@ generate_data <- function(H, K, J, XI, Omega) {
     X[[agent_idx]] <- list();
     for(event_idx in seq(1,T))
     {
-      X[[agent_idx]][[event_idx]] <- mvrnorm(J,XI,Omega);
+      X[[agent_idx]][[event_idx]] <- mvrnorm(J,zeta,Omega);
     }
   }
   
