@@ -14,7 +14,7 @@ update_Upsilon <- function(H, S_inv, mu_h, Sigma_h, mu_zeta, Sigma_zeta)
   # Update the middle term of equation 42
   middle_term = 0;
   for (h in seq(1,H)) {
-    mu_diff = mu_zeta - mu_h[[h]]  
+    mu_diff = mu_h[[h]] - mu_zeta;
     middle_term <- middle_term + Sigma_h[[h]] + mu_diff %*% t(mu_diff)
   }
   

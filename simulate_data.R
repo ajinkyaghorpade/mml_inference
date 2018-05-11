@@ -23,7 +23,8 @@
 library(bayesm);
 library(MASS);
 
-# This function generates MNL data for given number of agents H, number of choices J, number of items K, mean XI and sd cov matrix Omega
+# This function generates MNL data for given number of agents H, 
+# number of choices J, number of items K, mean Zeta and sd cov matrix Omega
 generate_data <- function(H, K, J, zeta, Omega) {
   # MNL coefficients \beta_h
   Beta <- list();
@@ -49,14 +50,14 @@ generate_data <- function(H, K, J, zeta, Omega) {
   
   # Calculate Y
   # Y ~ MNL(x_ht, Beta_h)
-  Y <- list();
+  Prob <- list();
   for(agent_idx in seq(1,H))
   {
-    Y[[agent_idx]] <- list();
+    Prob[[agent_idx]] <- list();
     for (event_idx in seq(1,T))
     {
-      Y[[agent_idx]][[event_idx]] <- exp(X[[agent_idx]][[event_idx]] %*% Beta[[agent_idx]]);
-      Y[[agent_idx]][[event_idx]] <- Y[[agent_idx]][[event_idx]] / sum(Y[[agent_idx]][[event_idx]]);
+      Prob[[agent_idx]][[event_idx]] <- exp(X[[agent_idx]][[event_idx]] %*% Beta[[agent_idx]]);
+      Prob[[agent_idx]][[event_idx]] <- Prob[[agent_idx]][[event_idx]] / sum(Prob[[agent_idx]][[event_idx]]);
     }
   }
   
@@ -67,9 +68,9 @@ generate_data <- function(H, K, J, zeta, Omega) {
     y[[agent_idx]] <- list();
     for(event_idx in seq(1,T))
     {
-      y[[agent_idx]][[event_idx]] <- rmultinom(n = 1, size = 1, prob = Y[[agent_idx]][[event_idx]]);
+      y[[agent_idx]][[event_idx]] <- rmultinom(n = 1, size = 1, prob = Prob[[agent_idx]][[event_idx]]);
     }
   }
-  data <- structure(list(y=y,Y=Y,X=X,Beta=Beta));
+  data <- structure(list(y=y,Y=Prob,X=X,Beta=Beta));
   return(data);
 }

@@ -4,12 +4,17 @@
 update_mu_sigma <- function(mu_h_h, Sigma_h_h, mu_zeta_h, Sigma_zeta_h, omega, Upsilon, y_h, x_h)
 {
   iter_num <- 1;
-  results <- perform_newtons_method(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5, iter_num);
+  results <- perform_newtons_method(omega, y_h, x_h, mu_h_h, Sigma_h_h,
+                                    mu_zeta, Upsilon, epsilon=1e-5,
+                                    iter_num, max_iter = 10000, obj_value = NULL);
   iter_num <- iter_num + 1;
   while (!results$converged) {
     #mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged
-    results <- perform_newtons_method(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5, iter_num);
+    results <- perform_newtons_method(omega, y_h, x_h, results$mu_h_h, results$Sigma_h_h,
+                                      mu_zeta, Upsilon, epsilon=1e-5,
+                                      iter_num, max_iter = 10000, results$obj_value);
     iter_num <- iter_num + 1;
+    print(iter_num);
   }
   return(results);
 }
@@ -139,7 +144,8 @@ evaluate_gradient_L_h <- function(omega, Upsilon, x_h, mu_h_h, Sigma_h_h, R_h_h,
 
 # Use the gradients and the hessian to perform the Newton Updates
 # Perform optimization step till convergence.
-perform_newtons_method <- function(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5, iter_num)
+perform_newtons_method <- function(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon,
+                                   epsilon=1e-5, iter_num, max_iter = 10000, obj_value)
 {
   converged <- FALSE;
   
@@ -149,7 +155,7 @@ perform_newtons_method <- function(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, 
   gradient_mu <- evaluate_gradient_mu_h(omega, Upsilon, mu_h_h, Sigma_h_h, y_h, x_h);
   stopifnot(is.non.singular.matrix(hessian_mu,tol=1e-80));
   hessian_mu_inv <- matrix.inverse(hessian_mu) ;
-  delta_mu_h <- - hessian_mu_inv %*% gradient_mu;
+  delta_mu_h <-  hessian_mu_inv %*% gradient_mu;
   lambda_sq_mu <- t(gradient_mu) %*% hessian_mu_inv %*% gradient_mu;
   
   
@@ -163,36 +169,52 @@ perform_newtons_method <- function(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, 
   gradient_L <- evaluate_gradient_L_h(omega, Upsilon, x_h, mu_h_h, Sigma_h_h, R_h_h, L_h_h);
   stopifnot(is.non.singular.matrix(hessian_L,tol=1e-80));
   hessian_L_inv <- matrix.inverse(hessian_L) ;
-  delta_L_h <- - hessian_L_inv %*% gradient_L;
+  delta_L_h <-  hessian_L_inv %*% gradient_L;
   lambda_sq_L <- t(gradient_L) %*% hessian_L_inv %*% gradient_L;
   
+  prev_obj_value <- obj_value
+  
+  # Line search to choose step size t by backtracking line search.
+  # alpha = 0.02 , beta = 0.4
+  #step_size_mu = backtracking_line_search("evaluate_L_tilde", list(mu_h_h=mu_h_h), gradient_mu, delta_mu_h, 
+  #                                       list(mu_h_h=mu_h_h, Sigma_h_h=Sigma_h_h, mu_zeta=mu_zeta,
+  #                                           Sigma_zeta=Sigma_zeta, omega=omega, Upsilon=Upsilon,
+  #                                          y_h=y_h, x_h=x_h),
+  #                                    alpha = 0.15, beta = 0.4)
+  #step_size_L = backtracking_line_search("evaluate_L_tilde", list(Sigma_h_h=Sigma_h_h), gradient_L, delta_L_h, 
+  #                                       list(mu_h_h=mu_h_h, Sigma_h_h=Sigma_h_h, mu_zeta=mu_zeta,
+  #                                           Sigma_zeta=Sigma_zeta, omega=omega, Upsilon=Upsilon,
+  #                                          y_h=y_h, x_h=x_h),
+  #                                    alpha = 0.15, beta = 0.4)
+  # Update parameters
+   mu_h_h <- mu_h_h + (1/sqrt(iter_num)) * delta_mu_h;
+   L_h_h <- L_h_h + (1/sqrt(iter_num)) * delta_L_h;
+  # mu_h_h <- mu_h_h + 0.1 * delta_mu_h;
+  # L_h_h <- L_h_h + 0.1 * delta_L_h;
+  Sigma_h_h <- L_h_h %*% t(L_h_h);
+   
+   print(mu_h_h);
+  
+  obj_value <- evaluate_L_tilde(mu_h_h, Sigma_h_h, mu_zeta, Sigma_zeta, omega, Upsilon, y_h, x_h);
+  
+  
+  # Debug print objective value
+  if(iter_num%%1==0)
+  {
+    print(paste0("Individual update iteration number : ", iter_num, 
+                 " Objective Function Value : ", sum(obj_value)));
+  }
+  
   # Stopping criterion.
-  if(lambda_sq_mu/2 <= epsilon)
+  #if(abs(lambda_sq_mu/2) <= epsilon || abs(min(lambda_sq_L/2)) <= epsilon)
+  if(((iter_num > 1) && min((abs(prev_obj_value - obj_value))) < epsilon)
+     || iter_num > max_iter)
   {
     converged <- TRUE;
-  }else
-  {
-    
-    # Line search to choose step size t by backtracking line search.
-    # alpha = 0.02 , beta = 0.4
-    #step_size_mu = backtracking_line_search("evaluate_L_tilde", list(mu_h_h=mu_h_h), gradient_mu, delta_mu_h, 
-     #                                       list(mu_h_h=mu_h_h, Sigma_h_h=Sigma_h_h, mu_zeta=mu_zeta,
-      #                                           Sigma_zeta=Sigma_zeta, omega=omega, Upsilon=Upsilon,
-       #                                          y_h=y_h, x_h=x_h),
-        #                                    alpha = 0.15, beta = 0.4)
-    #step_size_L = backtracking_line_search("evaluate_L_tilde", list(Sigma_h_h=Sigma_h_h), gradient_L, delta_L_h, 
-     #                                       list(mu_h_h=mu_h_h, Sigma_h_h=Sigma_h_h, mu_zeta=mu_zeta,
-      #                                           Sigma_zeta=Sigma_zeta, omega=omega, Upsilon=Upsilon,
-       #                                          y_h=y_h, x_h=x_h),
-        #                                    alpha = 0.15, beta = 0.4)
-    #Update parameters
-    mu_h_h <- mu_h_h + (1/iter_num) * delta_mu_h;
-    L_h_h <- L_h_h + (1/iter_num) * delta_L_h;
-    Sigma_h_h <- L_h_h %*% t(L_h_h);
   }
   
   # Create return structure
-  results <- list(mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged);
+  results <- list(mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged, obj_value = obj_value);
   
   return(results);
 }
