@@ -1,6 +1,6 @@
 # This empirical example generates the data for estimating MML model of 
 # Authors: A. Ghorpade
-
+ #TODO: Update comments
 # Data sources: Saint Louis Fed and Yahoo Finance
 # URL: https://www.stlouisfed.org/, http://finance.yahoo.com/
 
@@ -29,7 +29,7 @@ generate_data <- function(H, K, J, zeta, Omega) {
   Beta <- list();
   for (agent_idx in seq(1,H))
   {
-    Beta[[agent_idx]] <- rnorm(K, mean = zeta, sd = sqrt(Omega));
+    Beta[[agent_idx]] <- mvrnorm(1,zeta,Omega);
   }
   
   # X attributes
@@ -39,7 +39,11 @@ generate_data <- function(H, K, J, zeta, Omega) {
     X[[agent_idx]] <- list();
     for(event_idx in seq(1,T))
     {
-      X[[agent_idx]][[event_idx]] <- mvrnorm(J,zeta,Omega);
+      X[[agent_idx]][[event_idx]] <- matrix(nrow = J, ncol = K);
+      for(alt_idx in 1:J)
+      {
+        X[[agent_idx]][[event_idx]][alt_idx,] <- rnorm(K,0,0.5);
+      }
     }
   }
   
@@ -51,7 +55,7 @@ generate_data <- function(H, K, J, zeta, Omega) {
     Y[[agent_idx]] <- list();
     for (event_idx in seq(1,T))
     {
-      Y[[agent_idx]][[event_idx]] <- X[[agent_idx]][[event_idx]] %*% Beta[[agent_idx]];
+      Y[[agent_idx]][[event_idx]] <- exp(X[[agent_idx]][[event_idx]] %*% Beta[[agent_idx]]);
       Y[[agent_idx]][[event_idx]] <- Y[[agent_idx]][[event_idx]] / sum(Y[[agent_idx]][[event_idx]]);
     }
   }
@@ -63,8 +67,7 @@ generate_data <- function(H, K, J, zeta, Omega) {
     y[[agent_idx]] <- list();
     for(event_idx in seq(1,T))
     {
-      y[[agent_idx]][[event_idx]] <- rep(0,J);
-      y[[agent_idx]][[event_idx]][which.max(Y[[agent_idx]][[event_idx]])] <- 1;
+      y[[agent_idx]][[event_idx]] <- rmultinom(n = 1, size = 1, prob = Y[[agent_idx]][[event_idx]]);
     }
   }
   data <- structure(list(y=y,Y=Y,X=X,Beta=Beta));

@@ -1,10 +1,21 @@
-source('./simulate_data.R');
 
-#Required libraries
+# Load Required libraries
 library(mlogit);
 library(matrixcalc);
 library(bayesm);
 library(data.table);
+
+# Load required functions.
+source('./simulate_data.R');
+source('./perform_var_hier_inf.R');
+source('./initialize_mu_Sigma_zeta.R');
+source('./update_mu_zeta.R');
+source('./update_Upsilon.R');
+source('./prepare_data_mlogit.R');
+source('./update_omega.R');
+source('./update_mu_sigma.R');
+source('./update_Sigma_zeta.R');
+
 
 # Set the seed for random experiments
 set.seed(100);
@@ -22,14 +33,22 @@ K = 3 #10
 T = 25;
 
 # Heterogeneity of the agent population
-XI = seq(from = -2, to = 2, by = 4/(K-1));
+zeta = seq(from = -2, to = 2, by = 4/(K-1));
 # Low heterogeneity
 Omega = diag(0.25, nrow = K, ncol = K);
 
-data <- generate_data(H, K, J, XI, Omega);
+data <- generate_data(H, K, J, zeta, Omega);
 
 # High heterogeneity
 #Omega = diag(1, nrow = K, ncol = K);
 
 # MCMC samples from heirarchical MNL
-rhierMnlRwMixture();
+#rhierMnlRwMixture();
+
+# Initialize model parameters
+beta_0 <- rep(0, K);
+Omega_0 <- diag(100, K, K);
+S.inv <- diag(2, K, K);
+nu <- K + 3;
+
+perform_var_hier_inf (data, beta_0, Omega_0, S.inv, nu);
