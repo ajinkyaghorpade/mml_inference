@@ -8,7 +8,7 @@ perform_mcmc_inf <- function(mlogit.input, data ) {
                                        which(mlogit.input$ind.id==agent_idx & mlogit.input$panel.y),"panel.alt_idx"]));
   }
   ## set parms for priors and Z
-  R = 1250;
+  R = 125000;
   Prior1 = list(ncomp=1);
   keep = 5;
   Mcmc1 = list(R=R, keep=keep);
