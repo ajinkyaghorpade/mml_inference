@@ -2,7 +2,7 @@
 # Convert data to the bayesm format
 perform_mcmc_inf <- function(mlogit.input, data ) {
   bayesm.data <- list();
-  for (agent_idx in 1:H) {
+  for (agent_idx in 1:length(data$y)) {
     bayesm.data[[agent_idx]] <- list(X=as.matrix(mlogit.input[which(mlogit.input$ind.id==agent_idx),seq(1,dim(data$X[[1]][[1]])[2])]),
                                      y = as.numeric(mlogit.input[
                                        which(mlogit.input$ind.id==agent_idx & mlogit.input$panel.y),"panel.alt_idx"]));
@@ -12,7 +12,7 @@ perform_mcmc_inf <- function(mlogit.input, data ) {
   Prior1 = list(ncomp=1);
   keep = 5;
   Mcmc1 = list(R=R, keep=keep);
-  Data1 = list(p=J, lgtdata=bayesm.data);
+  Data1 = list(p=length(data$y[[1]][[1]]), lgtdata=bayesm.data);
   
   time.start <- proc.time();
   ## fit model without sign constraints

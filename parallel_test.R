@@ -28,7 +28,7 @@ source('./perform_var_hier_inf.R');
 # Set the seed for random experiments
 set.seed(100);
 
-registerDoMC(cores=30);
+registerDoMC(cores=20);
 
 #  Number of agents
 H_exp = c(250, 1000, 5000);
@@ -90,13 +90,13 @@ foreach (H_idx = 1:length(H_exp)) %dopar% {
           ###############
           
           
-          results_lap <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:3]),T=rep(25,H),J=3, option = 'Laplace');
+          results_lap <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:K]),T=rep(T,H),J=3, option = 'Laplace');
           save(results_lap, file = paste0(file.path('.',dir_name), "/results_lap.Rdata",sep='/'))
           
-          results_sa <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:3]),T=rep(25,H),J=3, option = 'SA');
+          results_sa <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:K]),T=rep(T,H),J=3, option = 'SA');
           save(results_sa, file = paste0(file.path('.',dir_name), "/results_sa.Rdata",sep='/'))
           
-          results_NCVMP <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:3]),T=rep(25,H),J=3, option = 'NCVMP');
+          results_NCVMP <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:K]),T=rep(T,H),J=3, option = 'NCVMP');
           save(results_NCVMP, file = paste0(file.path('.',dir_name), "/results_NCVMP.Rdata",sep='/'))
         }
       }
