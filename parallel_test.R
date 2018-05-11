@@ -5,6 +5,7 @@ library(matrixcalc);
 library(bayesm);
 library(data.table);
 library(pdist);
+library(foreach);
 
 # Load required functions.
 source('./simulate_data.R');
@@ -46,15 +47,15 @@ Omega_exp = list(low = diag(0.25, nrow = K, ncol = K), high = diag(1, nrow = K, 
 # Perform the experiments here.
 
 # For each type of different agent population size,do
-for (H_idx in 1:length(H_exp)) {
+foreach (H_idx = 1:length(H_exp)) %do% {
   # For different sizes of attributes spaces, do
-  for (K_idx in 1:length(K_exp)) {
+  foreach (K_idx  =  1:length(K_exp)) %do% {
     # For different number of choice events per user, do
-    for (T_idx in 1:length(T_exp)) {
+    foreach (T_idx  =  1:length(T_exp))  %do%{
       # For different sizes of choices available per choice event, do
-      for (J_idx in 1:length(J_exp)) {
+      foreach (J_idx  =  1:length(J_exp))  %do%{
         # For different levels of heterogeneity in the user choices per event
-        for (Omega_idx in 1:length(Omega_exp)) {
+        foreach (Omega_idx  =  1:length(Omega_exp)) %do% {
           # Generate artificial data
           H <- H_exp[H_idx];
           K <- K_exp[K_idx];
