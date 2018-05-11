@@ -4,7 +4,7 @@ perform_var_hier_inf <- function(data, beta_0, Omega_0, S.inv, nu)
   stopifnot(is.non.singular.matrix(Omega_0,tol=1e-80));
   Omega_0_inv <- matrix.inverse(Omega_0);
   H <- length(data$y);
-  convereged <- FALSE;
+  converged <- FALSE;
   
   # Initialize mu_h, Sigma_h, mu_zeta, Sima_zeta, omega, beta_h, Omega
   

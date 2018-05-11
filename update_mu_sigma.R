@@ -1,23 +1,34 @@
 # THis function performs update on mu_h and Sigma_h parameters from equations 25, 26 and 27
 
 
-update_mu_sigma <- function(mu_h_h, Sigma_h_h, mu_zeta_h, Sigma_zeta_h, omega, Upsilon, y_h, x_h)
+update_mu_sigma <- function(mu_h_h, Sigma_h_h, mu_zeta, Sigma_zeta, omega, Upsilon, y_h, x_h)
 {
-  iter_num <- 1;
-  results <- perform_newtons_method(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5, iter_num);
-  iter_num <- iter_num + 1;
-  while (!results$converged) {
-    #mu_h_h = mu_h_h, Sigma_h_h = Sigma_h_h, converged = converged
-    results <- perform_newtons_method(omega, y_h, x_h, mu_h_h, Sigma_h_h, mu_zeta, Upsilon, epsilon=1e-5, iter_num);
-    iter_num <- iter_num + 1;
-  }
-  return(results);
+  K <- dim(x_h[[1]])[2]; # number of attributes
+  parameters <- c(mu_h_h, c(Sigma_h_h));
+  
+  results <- optim(par = parameters, fn = evaluate_L_tilde, gr = evaluate_gradients,  mu_zeta=mu_zeta,
+        Sigma_zeta=Sigma_zeta, omega=omega, Upsilon=Upsilon, y_h=y_h, x_h=x_h, method = 'BFGS',
+        control = list(fnscale = -1));
+  
+  print(paste0('Convergence: ', results$convergence, ",   ", "Objective Value : ", results$value, sep = ""));
+  optim.values <- list();
+  optim.values[["mu_h_h"]] <- results$par[1:length(y_h[[1]])];
+  optim.values[["Sigma_h_h"]] <- matrix(results$par[length(y_h[[1]])+1:length(results$par)],K, K);
+  return(optim.values);
 }
 
 # Objective function - only containing the mu_h and Sigma_h terms
-evaluate_L_tilde <- function(mu_h_h, Sigma_h_h, mu_zeta, Sigma_zeta, omega, Upsilon, y_h, x_h)
+evaluate_L_tilde <- function(parameters, mu_zeta=mu_zeta, Sigma_zeta=Sigma_zeta,
+                             omega=omega, Upsilon=Upsilon, y_h=y_h, x_h=x_h)
 {
   K <- dim(x_h[[1]])[2]; # number of attributes
+  
+  # Extract mu_h_h
+  mu_h_h <- parameters[1:length(y_h[[1]])];
+  
+  # Extract Sigma_h_h
+  Sigma_h_h <- matrix(parameters[length(y_h[[1]])+1:length(parameters)],K, K);
+  
   stopifnot(is.non.singular.matrix(Sigma_h_h,tol=1e-80));
   normal_entropy <- 0.5 * log(((2 * pi * exp(1))^(K)) * det(Sigma_h_h));
   
@@ -43,7 +54,34 @@ evaluate_L_tilde <- function(mu_h_h, Sigma_h_h, mu_zeta, Sigma_zeta, omega, Upsi
   
   # L_tilde
   L_tilde <- normal_entropy - mvn_cross_entropy + d0;
-  return(L_tilde);
+  return(sum(L_tilde));
+}
+
+# Calculate gradients L_tilde with respect to mu_h and Sigma_h
+evaluate_gradients <- function(parameters, omega=omega, mu_zeta=mu_zeta, Sigma_zeta=Sigma_zeta,
+                               Upsilon=Upsilon, y_h=y_h, x_h=x_h)
+{
+  K <- dim(x_h[[1]])[2]; # number of attributes
+  
+  # Extract mu_h_h
+  mu_h_h <- parameters[1:length(y_h[[1]])];
+  
+  # Extract Sigma_h_h
+  Sigma_h_h <- matrix(parameters[length(y_h[[1]])+1:length(parameters)], K, K);
+  
+  # Calculate the gradients of mu_h_h
+  gradient_mu <- evaluate_gradient_mu_h(omega, Upsilon, mu_h_h, Sigma_h_h, y_h, x_h);
+  
+  # Calculate the gradients of Sigma_h_h
+  
+  R_h_h <- chol(Sigma_h_h);
+  L_h_h <- t(R_h_h);
+  L_h_h <- evaluate_gradient_L_h(omega, Upsilon, x_h, mu_h_h, Sigma_h_h, R_h_h, L_h_h);
+  
+  Sigma_h_h <- L_h_h %*% t(L_h_h);
+  
+  return(c(gradient_mu, c(Sigma_h_h)));
+  
 }
 
 
@@ -136,6 +174,7 @@ evaluate_gradient_L_h <- function(omega, Upsilon, x_h, mu_h_h, Sigma_h_h, R_h_h,
   gradient <- matrix.inverse(R_h_h) - (omega * Upsilon + quadratic_term) %*% L_h_h;
   return(gradient);
 }
+
 
 # Use the gradients and the hessian to perform the Newton Updates
 # Perform optimization step till convergence.
