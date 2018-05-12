@@ -76,10 +76,10 @@ foreach (H_idx = 1:length(H_exp)) %dopar% {
           mcmc_out <- perform_mcmc_inf(mlogit.input, data);
           
           # create dir name
-          dir_name <- paste0(names(Omega_exp[[Omega_idx]], J, T, K, H, sep='_'));
+          dir_name <- paste0(c(names(Omega_exp[[Omega_idx]]), J, T, K, H), collapse = '_');
           
           dir.create(file.path('.', dir_name));
-          save(mcmc_out, file = paste0(file.path('.',dir_name), "/mcmc_out.Rdata",sep='/'))
+          save(mcmc_out, file = paste0(file.path('.',dir_name), "/mcmc_out.Rdata",sep=''))
           
           
           #results_var <- perform_var_hier_inf (data, beta_0, Omega_0, S.inv, nu, mlogit.input, max_iter = 10000);
@@ -91,13 +91,13 @@ foreach (H_idx = 1:length(H_exp)) %dopar% {
           
           
           results_lap <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:K]),T=rep(T,H),J=3, option = 'Laplace');
-          save(results_lap, file = paste0(file.path('.',dir_name), "/results_lap.Rdata",sep='/'))
+          save(results_lap, file = paste0(file.path('.',dir_name), "/results_lap.Rdata",sep=''))
           
           results_sa <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:K]),T=rep(T,H),J=3, option = 'SA');
-          save(results_sa, file = paste0(file.path('.',dir_name), "/results_sa.Rdata",sep='/'))
+          save(results_sa, file = paste0(file.path('.',dir_name), "/results_sa.Rdata",sep=''))
           
           results_NCVMP <- VALARGE(as.vector(as.numeric(mlogit.input$panel.y)),as.matrix(mlogit.input[,1:K]),T=rep(T,H),J=3, option = 'NCVMP');
-          save(results_NCVMP, file = paste0(file.path('.',dir_name), "/results_NCVMP.Rdata",sep='/'))
+          save(results_NCVMP, file = paste0(file.path('.',dir_name), "/results_NCVMP.Rdata",sep=''))
         }
       }
     }
