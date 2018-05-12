@@ -31,7 +31,7 @@ set.seed(100);
 registerDoMC(cores=20);
 
 #  Number of agents
-H_exp = c(250, 1000, 5000);
+H_exp = c(250, 500, 1500);
 
 # Number of Choice items
 J_exp = c(3,12);
@@ -40,7 +40,7 @@ J_exp = c(3,12);
 K_exp = c(3, 10);
 
 # Number of observations per user
-T_exp = c(1, 5 ,15, 25);
+T_exp = c(1, 5 ,10, 15);
 
 # Heterogeneity of the agent population
 
